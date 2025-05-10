@@ -1,0 +1,31 @@
+# Python 관련
+__pycache__/
+*.py[cod]
+*.so
+*.ipynb_checkpoints
+
+# 환경 설정
+.env
+*.DS_Store
+
+# 모델 및 학습 결과
+*.pth
+*.pt
+*.onnx
+
+# 데이터셋 및 전처리 결과 (로컬 전용)
+data/wav/
+features/
+labels.npy
+
+# 오디오 파일 (직접 넣은 경우)
+*.wav
+
+# 기타 대용량 로그/캐시
+*.log
+*.tmp
+*.npy
+*.npz
+
+# Jupyter/Colab 관련
+.ipynb_checkpoints/
