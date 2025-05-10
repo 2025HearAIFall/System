@@ -1,0 +1,14 @@
+.gitignore
+LibrosaEmotionTrain/.gitignore
+"LibrosaEmotionTrain/data/5\354\260\250\353\205\204\353\217\204_2\354\260\250.csv"
+LibrosaEmotionTrain/models/emotion_cnn.pth
+LibrosaEmotionTrain/scripts/predict.py
+LibrosaEmotionTrain/scripts/preprocess.py
+LibrosaEmotionTrain/scripts/train.py
+LibrosaModel_test/features.py
+LibrosaModel_test/model.py
+LibrosaModel_test/models/emotion_cnn.pth
+LibrosaModel_test/predict.py
+LibrosaModel_test/train.py
+README.md
+models/emotion_cnn.pth
