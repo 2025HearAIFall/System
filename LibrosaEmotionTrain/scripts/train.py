@@ -14,16 +14,26 @@ os.makedirs(os.path.dirname(model_path), exist_ok=True)
 
 # 하이퍼파라미터
 BATCH_SIZE = 64
-EPOCHS = 20
+EPOCHS = 50
 LEARNING_RATE = 0.001
 NUM_CLASSES = 7
 
+# 데이터 불러오기
+file_ids = [fname.replace(".npy", "") for fname in sorted(os.listdir(feature_dir)) if fname.endswith(".npy")]
+labels = np.load(label_path)
+
+# 라벨 매핑
+label_map = {fid: label for fid, label in zip(file_ids, labels)}
+
+# 훈련/검증 분할 (ID만 나눔)
+train_ids, val_ids = train_test_split(file_ids, test_size=0.2, random_state=42)
+
 # 데이터셋 클래스
 class EmotionDataset(Dataset):
-    def __init__(self, feature_dir, labels, file_list):
+    def __init__(self, feature_dir, file_list, label_map):
         self.feature_dir = feature_dir
-        self.labels = labels
         self.file_list = file_list
+        self.label_map = label_map
 
     def __len__(self):
         return len(self.file_list)
@@ -31,46 +41,40 @@ class EmotionDataset(Dataset):
     def __getitem__(self, idx):
         file_id = self.file_list[idx]
         feature = np.load(os.path.join(self.feature_dir, f"{file_id}.npy"))
+        feature = (feature - feature.mean()) / (feature.std() + 1e-6)  # 정규화 추가
         feature_tensor = torch.tensor(feature, dtype=torch.float32).unsqueeze(0)  # (1, 40, 100)
-        label = torch.tensor(self.labels[idx], dtype=torch.long)
+        label = torch.tensor(self.label_map[file_id], dtype=torch.long)
         return feature_tensor, label
 
-# 데이터 불러오기
-file_ids = [fname.replace(".npy", "") for fname in sorted(os.listdir(feature_dir)) if fname.endswith(".npy")]
-labels = np.load(label_path)
-
-# 훈련/검증 분할
-train_ids, val_ids, train_labels, val_labels = train_test_split(file_ids, labels, test_size=0.2, random_state=42)
-
-train_dataset = EmotionDataset(feature_dir, train_labels, train_ids)
-val_dataset = EmotionDataset(feature_dir, val_labels, val_ids)
+train_dataset = EmotionDataset(feature_dir, train_ids, label_map)
+val_dataset = EmotionDataset(feature_dir, val_ids, label_map)
 
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE)
 
-# 모델 정의 (CNN)
-class CNNEmotionClassifier(nn.Module):
-    def __init__(self, num_classes=7):
-        super(CNNEmotionClassifier, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=3)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3)
-        self.pool = nn.AdaptiveMaxPool2d((9, 23))
-        self.dropout = nn.Dropout(0.3)
-        self.fc1 = nn.Linear(64 * 9 * 23, 256)
-        self.fc2 = nn.Linear(256, num_classes)
+# 모델 정의 (CNN + GRU)
+class CNN_GRU_EmotionClassifier(nn.Module):
+    def __init__(self, num_classes=NUM_CLASSES):
+        super(CNN_GRU_EmotionClassifier, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+        self.pool = nn.MaxPool2d(2)
+        self.gru = nn.GRU(input_size=32 * 20, hidden_size=128, batch_first=True)
+        self.fc1 = nn.Linear(128, 64)
+        self.fc2 = nn.Linear(64, num_classes)
 
-    def forward(self, x):
-        x = torch.relu(self.conv1(x))
-        x = torch.relu(self.conv2(x))
-        x = self.pool(x)
-        x = x.view(x.size(0), -1)
-        x = self.dropout(torch.relu(self.fc1(x)))
-        x = self.fc2(x)
-        return x
+    def forward(self, x):  # x: (B, 1, 40, 100)
+        x = torch.relu(self.conv1(x))   # (B, 32, 40, 100)
+        x = self.pool(x)                # (B, 32, 20, 50)
+        x = x.permute(0, 3, 1, 2)       # (B, 50, 32, 20)
+        x = x.contiguous().view(x.size(0), x.size(1), -1)  # (B, 50, 640)
+        _, h = self.gru(x)              # h: (1, B, 128)
+        x = torch.relu(self.fc1(h[-1])) # (B, 64)
+        return self.fc2(x)              # (B, num_classes)
 
 # 모델 학습
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = CNNEmotionClassifier(num_classes=NUM_CLASSES).to(device)
+print(f"현재 학습 디바이스: {device}")
+model = CNN_GRU_EmotionClassifier(num_classes=NUM_CLASSES).to(device)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
 criterion = nn.CrossEntropyLoss()
@@ -103,4 +107,4 @@ for epoch in range(EPOCHS):
 
 # 모델 저장
 torch.save(model.state_dict(), model_path)
-print(f"✅ 모델 저장 완료: {model_path}")
+print(f"모델 저장 완료: {model_path}")

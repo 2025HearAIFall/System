@@ -2,7 +2,6 @@
 __pycache__/
 *.py[cod]
 *.so
-*.ipynb_checkpoints
 
 # 환경 설정
 .env
@@ -24,7 +23,6 @@ labels.npy
 # 기타 대용량 로그/캐시
 *.log
 *.tmp
-*.npy
 *.npz
 
 # Jupyter/Colab 관련

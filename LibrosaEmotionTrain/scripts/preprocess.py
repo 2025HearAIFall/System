@@ -47,4 +47,4 @@ for i, row in df.iterrows():
 
 # 라벨 저장
 np.save(label_path, np.array(labels))
-print(f"✅ 전처리 완료: {len(labels)}개 저장, 실패 {len(missing)}개")
+print(f"전처리 완료: {len(labels)}개 저장, 실패 {len(missing)}개")
