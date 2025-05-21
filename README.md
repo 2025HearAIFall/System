@@ -45,5 +45,6 @@
 ## 🧠 사용 기술 스택
 - Python / PyTorch / Librosa / pandas / sklearn
 - 모델 학습: GPU (RTX 4060 Ti)
-- 데이터셋: [AI Hub 5차년도_2차 한국어 음성 감정 데이터](https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=263)
+- (舊)데이터셋: [AI Hub 5차년도_2차 한국어 음성 감정 데이터](https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=263)
+- (新)데이터셋: [AI Hub 5차년도_2차 한국어 음성 감정 데이터](https://aihub.or.kr/aihubdata/data/view.do?currMenu=115&topMenu=100&dataSetSn=259)
 - 시각화: seaborn, matplotlib
