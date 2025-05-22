@@ -175,3 +175,9 @@ cython_debug/
 
 # 영상 파일 무시
 *.m2ts
+
+# 오디오 파일 무시
+*.wav
+
+# MFCC 중간 결과 무시
+*.npy

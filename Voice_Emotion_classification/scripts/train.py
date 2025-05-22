@@ -1,4 +1,3 @@
-# 실행 3번째
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -9,11 +8,12 @@ import pandas as pd
 
 # --------- 1. Dataset ---------
 class MFCCDataset(Dataset):
-    def __init__(self, mfcc_dir, label_csv):
+    def __init__(self, mfcc_dir, label_csv, max_len=128):
         self.data = []
         self.labels = []
         self.label_map = {}
         self.mfcc_dir = Path(mfcc_dir)
+        self.max_len = max_len
 
         df = pd.read_csv(label_csv)
         classes = sorted(df['emotion'].unique())
@@ -29,8 +29,16 @@ class MFCCDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        mfcc = np.load(self.data[idx])
-        mfcc = torch.tensor(mfcc, dtype=torch.float32).unsqueeze(0)  # [1, 40, T]
+        mfcc = np.load(self.data[idx])  # [40, T]
+
+        # Truncate or pad
+        if mfcc.shape[1] < self.max_len:
+            pad_width = self.max_len - mfcc.shape[1]
+            mfcc = np.pad(mfcc, ((0, 0), (0, pad_width)), mode='constant')
+        else:
+            mfcc = mfcc[:, :self.max_len]
+
+        mfcc = torch.tensor(mfcc, dtype=torch.float32).unsqueeze(0)  # [1, 40, max_len]
         label = torch.tensor(self.labels[idx], dtype=torch.long)
         return mfcc, label
 
@@ -41,24 +49,25 @@ class CNN_GRU_Model(nn.Module):
         self.cnn = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.MaxPool2d((1, 2)),  # [B, 16, 40, T/2]
+            nn.MaxPool2d((1, 2)),  # 시간축 절반
         )
         self.gru = nn.GRU(input_size=16, hidden_size=64, batch_first=True, bidirectional=True)
         self.fc = nn.Linear(64 * 2, num_classes)
 
     def forward(self, x):
         x = self.cnn(x)              # [B, 16, 40, T/2]
-        x = x.mean(dim=2)       # [B, 16, T/2]
+        x = x.mean(dim=2)            # [B, 16, T/2]
         x = x.permute(0, 2, 1)       # [B, T/2, 16]
         out, _ = self.gru(x)         # [B, T/2, 128]
-        out = out[:, -1, :]          # 마지막 타임스텝
+        out = out[:, -1, :]          # [B, 128]
         return self.fc(out)
 
 # --------- 3. Train ---------
 def train():
     dataset = MFCCDataset(
-    "C:/github/System/Voice_Emotion_classification/data/mfcc",
-    "C:/github/System/Voice_Emotion_classification/data/labels.csv")
+        "C:/github/System/Voice_Emotion_classification/data/mfcc",
+        "C:/github/System/Voice_Emotion_classification/data/labels.csv"
+    )
     loader = DataLoader(dataset, batch_size=4, shuffle=True)
 
     model = CNN_GRU_Model(num_classes=len(dataset.label_map))
