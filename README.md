@@ -15,7 +15,7 @@
    - 기본 모델이 정상 작동함을 확인함
 
 2. **본격적 개발 단계 (한국어 기반)**
-   - AI Hub의 [5차년도_2차 한국어 음성 감정 데이터셋](https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=263) 사용
+   - AI Hub의 [감정 분류를 위한 대화 음성 데이터셋](https://aihub.or.kr/aihubdata/data/view.do?dataSetSn=263) 사용
    - 약 19,000개 이상의 `.wav`와 `csv` 파일 기반 학습
    - 감정 라벨은 '상황' 컬럼 기준 (angry, happiness, etc.)
    - Librosa로 MFCC 40차원 특징 추출 후 (40, 100) 크기로 고정
@@ -40,7 +40,6 @@
 1. 잡음 환경에서도 정확도를 유지할 수 있도록 **노이즈 필터링** 추가
 2. 음성뿐만 아니라 **얼굴 표정 인식**을 포함한 다중 입력 감정 분석
 3. 음성을 인식해 **실시간 자막 출력 기능** 구현
-4. 감정을 7개 → 4개 그룹으로 축소해 분류 정확도 개선 실험
 
 ## 🧠 사용 기술 스택
 - Python / PyTorch / Librosa / pandas / sklearn
