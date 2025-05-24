@@ -32,7 +32,7 @@
 - CNN + GRU 모델 구조 구현
 - CrossEntropyLoss + Adam Optimizer 기반 학습
 - Epoch 수 50으로 학습, 학습 정확도 약 55% 달성
-- 이후 Epoch 수를 100까지 확장하여 학습 정확도 약 81% 도달
+- 이후 Epoch 수를 100까지 확장하여 **학습 정확도 약 81% 도달**
 - 학습에는 GPU (RTX 4060 Ti) CUDA 환경 사용
 
 ### 5. 모델 저장 및 추론 준비
