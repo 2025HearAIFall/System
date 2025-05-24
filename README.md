@@ -23,7 +23,7 @@
 
 ### 3. 본격적 개발
 - AI Hub의 [감정 분류용 데이터셋](https://aihub.or.kr/aihubdata/data/view.do?currMenu=115&topMenu=100&dataSetSn=259) 활용
-- 참가자 0~9, 40~49, 90~99번 약 30명의 `.m2ts` 파일에서 음성 추출
+- 참가자 약 30명의 `.m2ts` 파일에서 음성 추출
 - 문장번호 기반으로 7개 감정(happiness, surprise, neutral, fear, disgust, anger, sadness) 자동 라벨링
 - Librosa로 40차원 MFCC 추출 후 시간축을 128로 고정
 - 정규화(z-score) 적용하여 학습 안정화
