@@ -1,4 +1,4 @@
-# 실행 2번째
+# 실행 2번째, data/mfcc/*.npy + labels.csv 생성
 import librosa
 import numpy as np
 import os

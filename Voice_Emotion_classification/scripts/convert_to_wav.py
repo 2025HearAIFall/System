@@ -1,4 +1,4 @@
-# 실행 1번째
+# 실행 1번째, → data/wav/*.wav 생성
 from pathlib import Path
 import subprocess
 

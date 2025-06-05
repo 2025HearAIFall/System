@@ -1,3 +1,4 @@
+# 모델 파라미터 확인 코드
 import torch
 import torch.nn as nn
 
