@@ -1,3 +1,4 @@
+# 실행 4번째, 모델 학습
 import torch
 import torch.nn as nn
 import torch.optim as optim

@@ -1,117 +1,109 @@
-import os, glob
-import librosa
-import numpy as np
+# 모델 평가 --> 정확도, classification report, confusion matrix
 import torch
+import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
+from pathlib import Path
+import numpy as np
+import pandas as pd
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 import matplotlib.pyplot as plt
 import seaborn as sns
-from pathlib import Path
 
-# === Config ===
-wav_dir = Path("C:/github/System/Voice_Emotion_classification/data/wav_test")
-model_path = Path("C:/github/System/Voice_Emotion_classification/model/cnn_gru_final.pt")
-label_names = ['Happiness', 'Surprise', 'Neutral', 'Fear', 'Disgust', 'Anger', 'Sadness']
+# --------- Dataset ---------
+class MFCCDataset(Dataset):
+    def __init__(self, mfcc_dir, label_csv, max_len=128):
+        self.data = []
+        self.labels = []
+        self.label_map = {}
+        self.mfcc_dir = Path(mfcc_dir)
+        self.max_len = max_len
 
-# === 라벨 추출 ===
-def extract_label_from_filename(filename):
-    sentence_num = int(filename.split('-')[1].split('.')[0])
-    if 1 <= sentence_num <= 50: return 0
-    elif 51 <= sentence_num <= 100: return 1
-    elif 101 <= sentence_num <= 150: return 2
-    elif 151 <= sentence_num <= 200: return 3
-    elif 201 <= sentence_num <= 250: return 4
-    elif 251 <= sentence_num <= 300: return 5
-    elif 301 <= sentence_num <= 350: return 6
-    else: return -1
+        df = pd.read_csv(label_csv)
+        classes = sorted(df['emotion'].unique())
+        self.label_map = {label: idx for idx, label in enumerate(classes)}
+        self.inv_label_map = {v: k for k, v in self.label_map.items()}
 
-def extract_mfcc(filepath, max_len=128):
-    y, sr = librosa.load(filepath, sr=16000)
-    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
-    if mfcc.shape[1] < max_len:
-        mfcc = np.pad(mfcc, ((0, 0), (0, max_len - mfcc.shape[1])), mode='constant')
-    else:
-        mfcc = mfcc[:, :max_len]
-    return mfcc
+        for _, row in df.iterrows():
+            path = self.mfcc_dir / f"{row['file']}.npy"
+            if path.exists():
+                self.data.append(path)
+                self.labels.append(self.label_map[row['emotion']])
 
-# === 평가용 Dataset ===
-class MFCCDataset(torch.utils.data.Dataset):
-    def __init__(self, wav_dir):
-        self.files = sorted(Path(wav_dir).glob("*.wav"))
-        self.X, self.y = [], []
-        for f in self.files:
-            label = extract_label_from_filename(f.name)
-            if label == -1:
-                print(f"[SKIP] Invalid label: {f.name}")
-                continue
-            mfcc = extract_mfcc(f)
-            self.X.append(mfcc)
-            self.y.append(label)
+    def __len__(self):
+        return len(self.data)
 
-        self.X = torch.tensor(self.X, dtype=torch.float32).unsqueeze(1)  # [B, 1, 40, T]
-        self.y = torch.tensor(self.y, dtype=torch.long)
+    def __getitem__(self, idx):
+        mfcc = np.load(self.data[idx])
+        if mfcc.shape[1] < self.max_len:
+            mfcc = np.pad(mfcc, ((0, 0), (0, self.max_len - mfcc.shape[1])), mode='constant')
+        else:
+            mfcc = mfcc[:, :self.max_len]
+        mfcc = torch.tensor(mfcc, dtype=torch.float32).unsqueeze(0)  # [1, 40, T]
+        label = torch.tensor(self.labels[idx], dtype=torch.long)
+        return mfcc, label
 
-    def __len__(self): return len(self.X)
-
-    def __getitem__(self, idx): return self.X[idx], self.y[idx]
-
-# === 모델 정의 ===
-class CNN_GRU_Model(torch.nn.Module):
-    def __init__(self, num_classes=7):
+# --------- Model (train.py와 동일) ---------
+class CNN_GRU_Model(nn.Module):
+    def __init__(self, num_classes):
         super().__init__()
-        self.cnn = torch.nn.Sequential(
-            torch.nn.Conv2d(1, 16, kernel_size=3, padding=1),
-            torch.nn.ReLU(),
-            torch.nn.MaxPool2d((1, 2))  # Time 축만 절반으로
+        self.cnn = nn.Sequential(
+            nn.Conv2d(1, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d((1, 2))
         )
-        self.gru = torch.nn.GRU(input_size=16, hidden_size=64, batch_first=True, bidirectional=True)
-        self.fc = torch.nn.Linear(128, num_classes)
+        self.gru = nn.GRU(input_size=64, hidden_size=128, num_layers=2,
+                          batch_first=True, bidirectional=True)
+        self.fc = nn.Linear(128 * 2, num_classes)
 
-    def forward(self, x):  # [B, 1, 40, T]
-        x = self.cnn(x)              # [B, 16, 40, T/2]
-        x = x.mean(dim=2)            # [B, 16, T/2]
-        x = x.permute(0, 2, 1)       # [B, T/2, 16]
-        _, h = self.gru(x)           # h: [2, B, 64]
-        h = torch.cat([h[0], h[1]], dim=1)  # [B, 128]
-        return self.fc(h)
+    def forward(self, x):
+        x = self.cnn(x)          # [B, 64, 40, T/2]
+        x = x.mean(dim=2)        # [B, 64, T/2]
+        x = x.permute(0, 2, 1)   # [B, T/2, 64]
+        out, _ = self.gru(x)     # [B, T/2, 256]
+        out = out[:, -1, :]
+        return self.fc(out)
 
-# === 실행 ===
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"[INFO] Using device: {device}")
-print(f"[INFO] CUDA available: {torch.cuda.is_available()}")
-print(f"[INFO] Loaded model from: {model_path}")
+# --------- Evaluation ---------
+def evaluate():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"✅ Using device: {device}")
 
-dataset = MFCCDataset(wav_dir)
-if len(dataset) == 0:
-    print("[ERROR] No valid wav files found.")
-    exit()
+    mfcc_dir = "C:/github/System/Voice_Emotion_classification/data/mfcc"
+    test_csv = "C:/github/System/Voice_Emotion_classification/data/test.csv"
+    model_path = "C:/github/System/Voice_Emotion_classification/model/cnn_gru_final.pt"
 
-loader = DataLoader(dataset, batch_size=32)
+    dataset = MFCCDataset(mfcc_dir, test_csv)
+    loader = DataLoader(dataset, batch_size=32)
 
-model = CNN_GRU_Model(num_classes=len(label_names)).to(device)
-model.load_state_dict(torch.load(str(model_path), map_location=device))
-model.eval()
+    model = CNN_GRU_Model(num_classes=len(dataset.label_map)).to(device)
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model.eval()
 
-all_preds, all_labels = [], []
-with torch.no_grad():
-    for X_batch, y_batch in loader:
-        X_batch = X_batch.to(device)
-        outputs = model(X_batch)
-        preds = torch.argmax(outputs, dim=1)
-        all_preds.extend(preds.cpu().numpy())
-        all_labels.extend(y_batch.numpy())
+    all_preds, all_labels = [], []
+    with torch.no_grad():
+        for x, y in loader:
+            x = x.to(device)
+            pred = model(x)
+            all_preds.extend(pred.argmax(1).cpu().numpy())
+            all_labels.extend(y.numpy())
 
-# === 결과 출력 ===
-acc = accuracy_score(all_labels, all_preds)
-print(f"\n[Test Accuracy] {acc * 100:.2f}%\n")
-print("[Classification Report]")
-print(classification_report(all_labels, all_preds, target_names=label_names))
+    acc = accuracy_score(all_labels, all_preds)
+    print(f"\n✅ [Test Accuracy] {acc*100:.2f}%\n")
+    print("[Classification Report]")
+    print(classification_report(all_labels, all_preds, target_names=list(dataset.label_map.keys())))
 
-cm = confusion_matrix(all_labels, all_preds)
-plt.figure(figsize=(8, 6))
-sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=label_names, yticklabels=label_names)
-plt.title("Confusion Matrix (Test Set)")
-plt.xlabel("Predicted")
-plt.ylabel("Actual")
-plt.tight_layout()
-plt.show()
+    cm = confusion_matrix(all_labels, all_preds)
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                xticklabels=list(dataset.label_map.keys()),
+                yticklabels=list(dataset.label_map.keys()))
+    plt.title("Confusion Matrix (Test Set)")
+    plt.xlabel("Predicted")
+    plt.ylabel("Actual")
+    plt.tight_layout()
+    plt.show()
+
+if __name__ == "__main__":
+    evaluate()
