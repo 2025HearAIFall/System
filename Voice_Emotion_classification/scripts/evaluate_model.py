@@ -1,4 +1,3 @@
-# 모델 평가 --> 정확도, classification report, confusion matrix
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
@@ -42,7 +41,7 @@ class MFCCDataset(Dataset):
         label = torch.tensor(self.labels[idx], dtype=torch.long)
         return mfcc, label
 
-# --------- Model (train.py와 동일) ---------
+# --------- Model ---------
 class CNN_GRU_Model(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
@@ -54,8 +53,11 @@ class CNN_GRU_Model(nn.Module):
             nn.MaxPool2d((1, 2))
         )
         self.gru = nn.GRU(input_size=64, hidden_size=128, num_layers=2,
-                          batch_first=True, bidirectional=True)
-        self.fc = nn.Linear(128 * 2, num_classes)
+                          batch_first=True, bidirectional=True, dropout=0.3)
+        self.fc = nn.Sequential(
+            nn.Dropout(0.3),
+            nn.Linear(256, num_classes)
+        )
 
     def forward(self, x):
         x = self.cnn(x)          # [B, 64, 40, T/2]
@@ -72,7 +74,7 @@ def evaluate():
 
     mfcc_dir = "C:/github/System/Voice_Emotion_classification/data/mfcc"
     test_csv = "C:/github/System/Voice_Emotion_classification/data/test.csv"
-    model_path = "C:/github/System/Voice_Emotion_classification/model/cnn_gru_final.pt"
+    model_path = "C:/github/System/Voice_Emotion_classification/model/cnn_gru.pt"
 
     dataset = MFCCDataset(mfcc_dir, test_csv)
     loader = DataLoader(dataset, batch_size=32)

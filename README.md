@@ -21,33 +21,39 @@
   **감정 간 구분이 어려워 학습 정확도가 약 20% 수준에 머무름 (상위 200개 샘플 기준)**
 - 원인 파악 후 완전히 다른 데이터셋을 기반으로 프로젝트를 새로 시작함
 
-### 3. 본격적 개발
-- AI Hub의 [감정 분류용 데이터셋](https://aihub.or.kr/aihubdata/data/view.do?currMenu=115&topMenu=100&dataSetSn=259) 활용
+### 3. 2차 시도 (학습 성공, 그러나 과적합)
+- AI Hub의 [감정 분류용 데이터셋](https://aihub.or.kr/aihubdata/data/view.do?currMenu=115&topMenu=100&dataSetSn=259) 사용
 - 참가자 약 30명의 `.m2ts` 파일에서 음성 추출
 - 문장번호 기반으로 7개 감정(happiness, surprise, neutral, fear, disgust, anger, sadness) 자동 라벨링
 - Librosa로 40차원 MFCC 추출 후 시간축을 128로 고정
 - 정규화(z-score) 적용하여 학습 안정화
-
-### 4. 모델 학습
-- CNN + GRU 모델 구조 구현
-- CrossEntropyLoss + Adam Optimizer 기반 학습
-- Epoch 수 50으로 학습, 학습 정확도 약 55% 달성
-- 이후 Epoch 수를 100까지 확장하여 **학습 정확도 약 81% 도달**
-- 학습에는 GPU (RTX 4060 Ti) CUDA 환경 사용
-
-### 5. 모델 저장 및 추론 준비
-- 학습된 모델을 `.pt` (state_dict) 형태로 저장
-- 총 파라미터 수 32,551개(check_model_params.py로 확인)의 경량 구조
-- Confusion matrix 시각화 결과에서도 모든 감정 클래스가 안정적으로 구분됨
-- 이후 TorchScript 변환을 통해 모바일 디바이스 탑재 준비 중
-
-## ✅ 현재 성능 요약
 - 최종 학습 정확도: **81.01%**
 - 총 약 3,000개 이상의 샘플 기반 학습
-- 감정 분류 정확도 높고, 실제 추론 성능도 우수. 단 Overfitting 여부 체크 해야 함.
-- 모델 경량화 상태에서 실시간 모바일 추론 가능성 확인됨
+- 모델은 학습 정확도는 높았지만, 테스트 정확도는 5~6%에 불과해 심각한 **과적합(Overfitting)**이 확인됨
 
-## 🔜 앞으로 추가할 기능들 (상황에 따라 변경 가능)
+### 4. 모델 구조 개선 (과적합(Overfitting) 해결)
+- AI Hub의 [감정 분류용 데이터셋](https://aihub.or.kr/aihubdata/data/view.do?currMenu=115&topMenu=100&dataSetSn=259) 사용. 2차 시도랑 동일
+- 과적합 원인을 모델의 표현력 부족으로 판단하고 구조를 다음과 같이 확장함:
+  - CNN: Conv2d(1→32→64), ReLU, MaxPool
+  - GRU(Gated Recurrent Unit): input_size=64, hidden_size=128, 2-layer, bidirectional + Dropout(0.3)
+  - FC(Fully Connected) Layer: Dropout(0.3) + Linear(256 → 7)
+- 구조 확장 후 파라미터 수는 약 **32K → 466K**로 증가하여 감정의 복잡한 특성을 효과적으로 학습할 수 있게 됨
+- 화자 기반으로 train/val/test를 분리하고 EarlyStopping 기법을 도입하여 일반화 성능 확보
+
+### 5. 학습 결과
+- 최종 학습 정확도 약 **91.09%**, validation accuracy는 **64.04%**
+- 테스트셋 평가 결과 정확도 **68.51%**, macro F1-score **0.68**을 달성
+- 모든 감정 클래스에서 precision/recall/f1이 균형 있게 분포됨
+- Confusion matrix 시각화 결과, 감정별 예측 성능이 명확히 개선됨
+
+## ✅ 현재 성능 요약
+- 최종 테스트 정확도: **68.51%** (macro F1-score: 0.68)
+- 총 파라미터 수: **466,055개**
+- 총 101명의 화자, 10,351개의 음성 기반 학습
+- 과적합 없이 안정적으로 학습된 모델로 실사용 가능성 확보
+- 추론 성능 우수하며 TorchScript 변환 및 모바일 배포 가능 구조 유지
+
+## 🔜 앞으로 추가할 예정인 기능들 (상황에 따라 변경 가능)
 1. 잡음 환경에서도 정확도를 유지할 수 있도록 **노이즈 필터링** 및 **데이터 증강** 기능 적용
 2. 음성뿐만 아니라 **얼굴 표정 인식**을 포함한 **멀티모달 감정 분석 모델** 확장
 3. 실시간 추론을 위한 **TorchScript 변환 모델 테스트 및 경량화 (quantization)**

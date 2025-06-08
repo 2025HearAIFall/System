@@ -14,8 +14,11 @@ class CNN_GRU_Model(nn.Module):
             nn.MaxPool2d((1, 2))  # [B, 64, 40, T/2]
         )
         self.gru = nn.GRU(input_size=64, hidden_size=128, num_layers=2,
-                          batch_first=True, bidirectional=True)
-        self.fc = nn.Linear(128 * 2, num_classes)
+                          batch_first=True, bidirectional=True, dropout=0.3)
+        self.fc = nn.Sequential(
+            nn.Dropout(0.3),
+            nn.Linear(128 * 2, num_classes)
+        )
 
     def forward(self, x):
         x = self.cnn(x)
@@ -35,5 +38,5 @@ def count_parameters(model):
 # --------- 실행 ---------
 if __name__ == "__main__":
     model = CNN_GRU_Model(num_classes=7)
-    model.load_state_dict(torch.load("C:/github/System/Voice_Emotion_classification/model/cnn_gru_final.pt", map_location='cpu'))
+    model.load_state_dict(torch.load("C:/github/System/Voice_Emotion_classification/model/cnn_gru.pt", map_location='cpu'))
     count_parameters(model)

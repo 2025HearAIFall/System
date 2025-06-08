@@ -1,4 +1,3 @@
-# 실행 4번째, 모델 학습
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -43,7 +42,7 @@ class MFCCDataset(Dataset):
         label = torch.tensor(self.labels[idx], dtype=torch.long)
         return mfcc, label
 
-# --------- 2. Model (확장된 버전) ---------
+# --------- 2. Model ---------
 class CNN_GRU_Model(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
@@ -55,18 +54,38 @@ class CNN_GRU_Model(nn.Module):
             nn.MaxPool2d((1, 2))  # [B, 64, 40, T/2]
         )
         self.gru = nn.GRU(input_size=64, hidden_size=128, num_layers=2,
-                          batch_first=True, bidirectional=True)
-        self.fc = nn.Linear(128 * 2, num_classes)
+                          batch_first=True, bidirectional=True, dropout=0.3)
+        self.fc = nn.Sequential(
+            nn.Dropout(0.3),
+            nn.Linear(128 * 2, num_classes)
+        )
 
     def forward(self, x):
         x = self.cnn(x)           # [B, 64, 40, T/2]
         x = x.mean(dim=2)         # [B, 64, T/2]
         x = x.permute(0, 2, 1)    # [B, T/2, 64]
         out, _ = self.gru(x)      # [B, T/2, 256]
-        out = out[:, -1, :]       # 마지막 time step 사용
+        out = out[:, -1, :]
         return self.fc(out)
 
-# --------- 3. Train Function ---------
+# --------- 3. EarlyStopping ---------
+class EarlyStopping:
+    def __init__(self, patience=7):
+        self.patience = patience
+        self.best_acc = 0
+        self.counter = 0
+        self.should_stop = False
+
+    def step(self, current_acc):
+        if current_acc > self.best_acc:
+            self.best_acc = current_acc
+            self.counter = 0
+        else:
+            self.counter += 1
+        if self.counter >= self.patience:
+            self.should_stop = True
+
+# --------- 4. Train ---------
 def train():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"✅ Using device: {device}")
@@ -85,9 +104,12 @@ def train():
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
+    early_stopping = EarlyStopping(patience=7)
+    best_model_state = None
+
     train_accs, val_accs = [], []
 
-    for epoch in range(1, 51):
+    for epoch in range(1, 100):
         model.train()
         total_loss, correct, total = 0, 0, 0
         for x, y in train_loader:
@@ -102,10 +124,10 @@ def train():
             total_loss += loss.item()
             correct += (pred.argmax(1) == y).sum().item()
             total += y.size(0)
+
         train_acc = correct / total
         train_accs.append(train_acc)
 
-        # Validation
         model.eval()
         correct, total = 0, 0
         with torch.no_grad():
@@ -119,11 +141,17 @@ def train():
 
         print(f"[Epoch {epoch:02d}] Train Acc: {train_acc:.2%} | Val Acc: {val_acc:.2%}")
 
-    # Save Model
-    torch.save(model.state_dict(), "C:/github/System/Voice_Emotion_classification/model/cnn_gru_final.pt")
-    print("✅ 모델 저장 완료: cnn_gru_final.pt")
+        if val_acc > early_stopping.best_acc:
+            best_model_state = model.state_dict()
 
-    # Plot Acc Curve
+        early_stopping.step(val_acc)
+        if early_stopping.should_stop:
+            print(f"🛑Early stopping at epoch {epoch} (Val Acc stagnated)")
+            break
+
+    torch.save(best_model_state, "C:/github/System/Voice_Emotion_classification/model/cnn_gru.pt")
+    print("✅모델 저장 완료: cnn_gru.pt")
+
     plt.plot(train_accs, label='Train Acc')
     plt.plot(val_accs, label='Val Acc')
     plt.xlabel("Epoch")

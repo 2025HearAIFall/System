@@ -12,7 +12,7 @@ df = pd.read_csv(label_path)
 # 3. 참가자 번호 추출
 df['speaker'] = df['file'].apply(lambda x: int(x.split('-')[0]))
 
-# 4. 화자 기반 분할 (예: 70/15/15%)
+# 4. 화자 기반 분할 (train: 70%/val: 15%/test: 15%)
 train_ids = list(range(0, 70))     # 000~069
 val_ids   = list(range(70, 85))    # 070~084
 test_ids  = list(range(85, 100))   # 085~099
