@@ -29,7 +29,7 @@
 - 정규화(z-score) 적용하여 학습 안정화
 - 최종 학습 정확도: **81.01%**
 - 총 약 3,000개 이상의 샘플 기반 학습
-- 모델은 학습 정확도는 높았지만, 테스트 정확도는 5~6%에 불과해 심각한 **과적합(Overfitting)**이 확인됨
+- 모델은 학습 정확도는 높았지만, 테스트 정확도는 5~6%에 불과해 심각한 **과적합**(**Overfitting**)이 확인됨
 
 ### 4. 모델 구조 개선 (과적합(Overfitting) 해결)
 - AI Hub의 [감정 분류용 데이터셋](https://aihub.or.kr/aihubdata/data/view.do?currMenu=115&topMenu=100&dataSetSn=259) 사용. 2차 시도랑 동일
