@@ -6,7 +6,7 @@ const emojiMap = {
   angry: '😠 (화남)',
   fear: '😱 (공포)',
   surprise: '😲 (놀람)',
-  neutral: '😐 (평범)',
+  neutral: '😐 (중립)',
   disgust: '🤢 (혐오)',
 };
 

@@ -56,7 +56,7 @@ model = CNN_GRU_Model(num_classes).to(device)
 model.load_state_dict(torch.load(model_path, map_location=device))
 model.eval()
 
-print(f"[DEBUG] 모델 로드 완료, device: {device}")
+print(f"[DEBUG] 모델 로드 완료\ndevice: {device}")
 
 label_map = {
     0: ("angry", "분노"),
