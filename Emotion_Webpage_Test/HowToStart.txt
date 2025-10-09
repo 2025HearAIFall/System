@@ -1,0 +1,7 @@
+Emotion_Webpage_Test
+
+emotion_api_server.py, main.jsx
+2개의 파일을 각 파일 아래의 주석에 적힌 방법대로
+실행시키면 된다.
+
+즉, 2개의 창을 필요로 함.
