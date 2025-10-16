@@ -182,7 +182,25 @@ class EarlyStopping:
             self.should_stop = True
 
 # =========================
-# 4. Train
+# 4. Plot helpers
+# =========================
+def plot_accuracy(train_accs, val_accs, save_path, title="Train vs Val Accuracy"):
+    import numpy as np
+    epochs = np.arange(1, len(train_accs) + 1)
+    plt.figure(figsize=(8, 5), dpi=160)
+    plt.plot(epochs, train_accs, label="Train Acc")
+    plt.plot(epochs, val_accs, label="Val Acc")
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.title(title)
+    plt.ylim(0.2, 1.0)   # 비교 그래프와 유사 축 범위
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(save_path, bbox_inches="tight")
+    print(f"📈 Saved: {save_path}")
+
+# =========================
+# 5. Train
 # =========================
 def train():
     set_seed(SEED)
@@ -197,6 +215,12 @@ def train():
     VAL_CSV   = f"{DATA_DIR}/val.csv"
     MODEL_DIR = f"{PROJECT_ROOT}/model"
     SAVE_PATH = f"{MODEL_DIR}/cnn_gru_5mb.pt"   # 최종 1개만 저장
+
+    # --- figure 저장 경로 ---
+    FIG_DIR = f"{PROJECT_ROOT}/figures"
+    os.makedirs(FIG_DIR, exist_ok=True)
+    ACC_PNG = f"{FIG_DIR}/train_val_acc_5mb_final_v2.png"
+    CM_PNG  = f"{FIG_DIR}/cm_val_5mb_final_v2.png"
 
     ensure_exists(MFCC_DIR, "MFCC_DIR")
     ensure_exists(TRAIN_CSV, "TRAIN_CSV")
@@ -299,21 +323,17 @@ def train():
     print(f"✅ 모델 저장 완료: {SAVE_PATH}  (파일 크기: {size_mb:.2f} MB, best epoch: {best_epoch})")
     print(f"📊 파라미터 수: {total_params:,} (~{approx_fp32_mb:.2f} MB if raw FP32 tensor)")
 
-    # 학습 곡선
+    # ---- 학습 곡선 PNG 저장 ----
     try:
-        plt.figure()
-        plt.plot(train_accs, label='Train Acc')
-        plt.plot(val_accs, label='Val Acc')
-        plt.xlabel("Epoch")
-        plt.ylabel("Accuracy")
-        plt.title("Train vs Val Accuracy (5MB Model - Final v2)")
-        plt.legend()
-        plt.tight_layout()
-        plt.show()
+        plot_accuracy(
+            train_accs, val_accs,
+            ACC_PNG,
+            title="Train vs Val Accuracy (5MB Model - Final v2)"
+        )
     except Exception as e:
-        print("(그래프 생략) 이유:", e)
+        print("(그래프 저장 생략) 이유:", e)
 
-    # (선택) 혼동행렬
+    # ---- 혼동행렬 PNG 저장(선택) ----
     try:
         inv_map = val_set.inv_label_map
         all_preds, all_labels = [], []
@@ -327,11 +347,15 @@ def train():
                 all_preds.extend(logits.argmax(1).cpu().numpy().tolist())
                 all_labels.extend(y.numpy().tolist())
         cm = confusion_matrix(all_labels, all_preds, labels=list(range(num_classes)))
-        disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=[inv_map[i] for i in range(num_classes)])
+        disp = ConfusionMatrixDisplay(
+            confusion_matrix=cm,
+            display_labels=[inv_map[i] for i in range(num_classes)]
+        )
         disp.plot(xticks_rotation=45, cmap='Blues', colorbar=False)
         plt.title("Validation Confusion Matrix (5MB Model - Final v2)")
         plt.tight_layout()
-        plt.show()
+        plt.savefig(CM_PNG, bbox_inches="tight")
+        print(f"🧩 Saved: {CM_PNG}")
     except Exception as e:
         print("혼동행렬 생략 이유:", e)
 
